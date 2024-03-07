@@ -205,12 +205,15 @@ export class JoyApi {
     const finalizedHeadHash = await this.finalizedHash();
     const { number: blockNumber } = await this.api.rpc.chain.getHeader(`${finalizedHeadHash}`);
     const currentBlock = blockNumber.toBn();
+    const blockInAYear = currentBlock.subn((365 * 24 * 60 * 60) / 6);
 
     // Calculate block for exactly 1 year ago
     const startBlockHash = await this.api.rpc.chain.getBlockHash(
-      currentBlock.subn((365 * 24 * 60 * 60) / 6)
+      blockInAYear < new BN(0) ? new BN(0) : blockInAYear
     );
-    const endBlockHash = await this.api.rpc.chain.getBlockHash(currentBlock);
+    const endBlockHash = await this.api.rpc.chain.getBlockHash(
+      currentBlock < new BN(0) ? new BN(0) : currentBlock
+    );
 
     return await this.getValidatorReward(startBlockHash.toHex(), endBlockHash.toHex());
   }
@@ -219,7 +222,7 @@ export class JoyApi {
     const activeValidatorAddresses = await this.api.query.session.validators();
     const validators = await this.api.query.staking.validators.entries();
     const activeValidators = validators.filter(([key, _]) =>
-      activeValidatorAddresses.includes(key.args[0].toString())
+      activeValidatorAddresses.includes(key.args[0])
     );
 
     const activeEra = await this.api.query.staking.activeEra();
@@ -247,7 +250,9 @@ export class JoyApi {
       averageRewardInAnEra
         .muln(ERAS_PER_YEAR)
         .mul(percentToPerbill(100).sub(averageCommission))
-        .div(averageTotalStakeInCurrentEra)
+        .div(
+          averageTotalStakeInCurrentEra.eq(new BN(0)) ? new BN(1) : averageTotalStakeInCurrentEra
+        )
     );
 
     return apr;
@@ -257,12 +262,12 @@ export class JoyApi {
     const finalizedHeadHash = await this.finalizedHash();
     const { number: blockNumber } = await this.api.rpc.chain.getHeader(`${finalizedHeadHash}`);
     const currentBlock = blockNumber.toBn();
+    const blockInAYear = currentBlock.subn((365 * 24 * 60 * 60) / 6);
 
     // Calculate block for exactly 1 year ago
     const blockHashAYearAgo = await this.api.rpc.chain.getBlockHash(
-      currentBlock.subn((365 * 24 * 60 * 60) / 6)
+      blockInAYear < new BN(0) ? new BN(0) : blockInAYear
     );
-
     const totalSupplyAYearAgo = await this.totalIssuanceInJOY(blockHashAYearAgo);
     const totalSupply = await this.totalIssuanceInJOY();
 
